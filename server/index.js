@@ -1,70 +1,60 @@
-// Importing required packages
 const express = require("express");
 const { ApolloServer } = require("@apollo/server");
 const { expressMiddleware } = require("@apollo/server/express4");
 const bodyParser = require("body-parser");
 const cors = require("cors");
-const axios = require("axios");
+const { default: axios } = require("axios");
 
-// Define the function to start the server
+const { USERS } = require("./user");
+const { TODOS } = require("./todo");
+
 async function startServer() {
-    const app = express();
+  const app = express();
+  const server = new ApolloServer({
+    typeDefs: `
+        type User {
+            id: ID!
+            name: String!
+            username: String!
+            email: String!
+            phone: String!
+            website: String!
+        }
 
-    // Initialize the Apollo Server
-    const server = new ApolloServer({ 
-        typeDefs: `
-            type User {
-                id: ID!
-                name: String!
-                username: String!
-                email: String!
-                phone: String!
-                website: String!
-            }
-            type Todo {
-                id: ID!
-                title: String!
-                completed: Boolean
-                user: User
-                userId: ID!  
-            }
-            type Query {
-                getTodos: [Todo]
-                getAllUsers: [User]
-                getUser(id: ID!): User
-            }
-        `,
-        resolvers: {
-            Todo: {
-                user: async (todo) => {
-                    const response = await axios.get(`https://jsonplaceholder.typicode.com/users/${todo.userId}`); // Use userId to fetch user
-                    return response.data; // Return the user data
-                },
-            },
-            Query: {
-                getTodos: async () => 
-                    (await axios.get("https://jsonplaceholder.typicode.com/todos")).data,
-                getAllUsers: async () => 
-                    (await axios.get("https://jsonplaceholder.typicode.com/users")).data,
-                getUser: async (parent, { id }) => 
-                    (await axios.get(`https://jsonplaceholder.typicode.com/users/${id}`)).data,
-            },
-        },
-    });
+        type Todo {
+            id: ID!
+            title: String!
+            completed: Boolean
+            user: User
+        }
 
-    // Middleware setup
-    app.use(bodyParser.json());
-    app.use(cors());
+        type Query {
+            getTodos: [Todo]
+            getAllUsers: [User]
+            getUser(id: ID!): User
+        }
 
-    // Start the Apollo server
-    await server.start();
+    `,
+    resolvers: {
+      Todo: {
+        user: (todo) => USERS.find((e) => e.id === todo.id),
+      },
+      Query: {
+        getTodos: () => TODOS,
+        getAllUsers: () => USERS,
+        getUser: async (parent, { id }) => USERS.find((e) => e.id === id),
+      },
+    },
+  });
 
-    // Set up the GraphQL endpoint
-    app.use("/graphql", expressMiddleware(server));
+  app.use(bodyParser.json());
+  app.use(cors());
 
-    // Start listening on port 8000
-    app.listen(8000, () => console.log("Server Started at PORT: 8000"));
+  await server.start();
+
+  app.use("/graphql", expressMiddleware(server));
+
+  app.listen(8000, () => console.log("Serevr Started at PORT 8000"));
 }
 
-// Start the function to run the server
 startServer();
